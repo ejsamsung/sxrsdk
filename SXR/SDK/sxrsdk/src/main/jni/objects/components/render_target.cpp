@@ -23,9 +23,9 @@ namespace sxr {
 
 /**
  * Constructs a render target component which renders to a designated texture.
- * The scene will be rendered from the viewpoint of the scene object
+ * The scene will be rendered from the viewpoint of the node
  * the RenderTarget is attached to. Nothing will be rendered if
- * the render target is not attached to a scene object or
+ * the render target is not attached to a node or
  * if it does not have a texture.
  *
  * If a RenderTarget is actually a ShadowMap, it is rendered
@@ -47,8 +47,10 @@ RenderTarget::RenderTarget(RenderTexture* tex, bool is_multiview)
     }
 }
 void RenderTarget::beginRendering(Renderer *renderer) {
-    if(mRenderTexture == nullptr)
+    if(mRenderTexture == nullptr) {
+        glViewport(0,0,mRenderState.viewportWidth,mRenderState.viewportHeight);
         return;
+    }
 
     mRenderTexture->useStencil(renderer->useStencilBuffer());
     mRenderState.viewportWidth = mRenderTexture->width();
@@ -76,6 +78,18 @@ RenderTarget::RenderTarget(Scene* scene)
     mRenderState.scene = scene;
 
 }
+
+RenderTarget::RenderTarget(Scene* scene, int defaultViewportW, int defaultViewportH)
+        : Component(RenderTarget::getComponentType()), mNextRenderTarget(nullptr), mRenderTexture(nullptr),mRenderDataVector(std::make_shared< std::vector<RenderData*>>()){
+    mRenderState.is_shadow = false;
+    mRenderState.shadow_map = nullptr;
+    mRenderState.material_override = NULL;
+    mRenderState.is_multiview = false;
+    mRenderState.scene = scene;
+    mRenderState.viewportWidth = defaultViewportW;
+    mRenderState.viewportHeight = defaultViewportH;
+}
+
 RenderTarget::RenderTarget(RenderTexture* tex, const RenderTarget* source)
         : Component(RenderTarget::getComponentType()),mNextRenderTarget(nullptr),
           mRenderTexture(tex), mRenderDataVector(source->mRenderDataVector)

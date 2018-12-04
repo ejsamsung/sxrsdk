@@ -65,20 +65,20 @@ class WidgetPickHandler implements SXRInputManager.ICursorControllerSelectListen
     }
 
     @Override
-    public void onCursorControllerAdded(SXRCursorController gvrCursorController) {
+    public void onCursorControllerAdded(SXRCursorController sxrCursorController) {
         Log.d(Log.SUBSYSTEM.INPUT, TAG,"onCursorControllerAdded: %s",
-                gvrCursorController.getClass().getSimpleName());
+                sxrCursorController.getClass().getSimpleName());
 
     }
 
     @Override
-    public void onCursorControllerRemoved(SXRCursorController gvrCursorController) {
+    public void onCursorControllerRemoved(SXRCursorController sxrCursorController) {
         Log.d(Log.SUBSYSTEM.INPUT, TAG,"onCursorControllerRemoved: %s",
-                gvrCursorController.getClass().getSimpleName());
+                sxrCursorController.getClass().getSimpleName());
 
-        gvrCursorController.removePickEventListener(mPickEventListener);
-        gvrCursorController.removePickEventListener(mTouchEventsListener);
-        gvrCursorController.removeControllerEventListener(mControllerEvent);
+        sxrCursorController.removePickEventListener(mPickEventListener);
+        sxrCursorController.removePickEventListener(mTouchEventsListener);
+        sxrCursorController.removeControllerEventListener(mControllerEvent);
     }
 
     static private class PickEventsListener implements IPickEvents {
@@ -238,7 +238,24 @@ class WidgetPickHandler implements SXRInputManager.ICursorControllerSelectListen
         public void onEnter(SXRNode sceneObj, SXRPicker.SXRPickedObject collision) {
         }
 
-        public void onInside(SXRNode sceneObj, SXRPicker.SXRPickedObject collision) {
+        public void onInside(final SXRNode sceneObj, SXRPicker.SXRPickedObject collision) {
+            final MotionEvent event = collision.motionEvent;
+            if (event != null) {
+                Log.d(Log.SUBSYSTEM.INPUT, TAG, "onMotionInside() event = %s", event);
+
+                final Widget widget = WidgetBehavior.getTarget(sceneObj);
+                if (widget != null && widget.isTouchable() && mTouched.contains(widget)) {
+                    Log.d(TAG, "onMotionInside() widget %s ", widget.getName());
+                    WidgetLib.getMainThread().runOnMainThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            GestureDetector gestureDetector = new GestureDetector(
+                                    sceneObj.getSXRContext().getContext(), mGestureListener);
+                            gestureDetector.onTouchEvent(event);
+                        }
+                    });
+                }
+            }
         }
 
         private FlingHandler.FlingAction mFling;

@@ -32,7 +32,7 @@ class GLTexture;
 class Renderer;
 /**
  * A render target is a component which allows the scene to be rendered
- * into a texture from the viewpoint of a particular scene object.
+ * into a texture from the viewpoint of a particular node.
  * A render target may have a custom camera to allow control
  * over the projection matrix.
  * @see RenderTexture
@@ -43,6 +43,7 @@ class RenderTarget : public Component
 public:
     explicit RenderTarget(RenderTexture*, bool is_multiview);
     explicit RenderTarget(Scene*);
+    explicit RenderTarget(Scene*, int defaultViewportW, int defaultViewportH);
     explicit RenderTarget(RenderTexture*, const RenderTarget* source);
     RenderTarget();
     virtual ~RenderTarget();

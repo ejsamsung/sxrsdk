@@ -645,7 +645,7 @@ public class SXRMesh extends SXRHybridObject implements PrettyPrint {
      * Constructs a {@link SXRMesh mesh} that contains this mesh.
      * <p>
      * This is primarily useful with the {@link SXRPicker}, which does
-     * "ray casting" to detect which scene object you're pointing to. Ray
+     * "ray casting" to detect which node you're pointing to. Ray
      * casting is computationally expensive, and you generally want to limit the
      * number of {@linkplain SXRCollider triangles to check.} A simple
      * {@linkplain SXRContext#createQuad(float, float) quad} is cheap enough,
@@ -757,7 +757,7 @@ public class SXRMesh extends SXRHybridObject implements PrettyPrint {
      * @param gvrContext    the current context
      * @param width         a number representing the width
      * @param height        a number representing the height
-     * @param centralAngle  the central angle of the arc
+     * @param centralAngle  the central angle of the arc in degrees
      * @param radius        the radius of the circle
      * @return
      */

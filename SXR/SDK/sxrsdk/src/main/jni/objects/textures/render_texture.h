@@ -30,12 +30,10 @@ struct RenderTextureInfo{
     int fboWidth;
     int fboHeight;
     int multisamples;
-    int views;
     GLuint fboId;
     GLuint texId;
     bool useMultiview;
     int layers;
-    int fboType;
     int viewport[4];
 };
 class RenderTexture : public Texture
@@ -64,6 +62,7 @@ public:
     virtual int height() const { return getImage()->getHeight(); }
     virtual unsigned int getFrameBufferId() const = 0;
     virtual void bind() = 0;
+    virtual void unbind() = 0;
     virtual void beginRendering(Renderer*) = 0;
     virtual void endRendering(Renderer*) = 0;
 

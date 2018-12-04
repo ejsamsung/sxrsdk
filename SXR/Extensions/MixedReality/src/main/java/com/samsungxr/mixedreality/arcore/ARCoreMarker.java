@@ -17,16 +17,16 @@ package com.samsungxr.mixedreality.arcore;
 
 import com.google.ar.core.AugmentedImage;
 
-import com.samsungxr.mixedreality.SXRAugmentedImage;
+import com.samsungxr.mixedreality.SXRMarker;
 import com.samsungxr.mixedreality.SXRTrackingState;
 
 /**
  * Represents an ARCore Augmented Image
  */
-public class ARCoreAugmentedImage extends SXRAugmentedImage {
+public class ARCoreMarker extends SXRMarker {
     private AugmentedImage mAugmentedImage;
 
-    protected ARCoreAugmentedImage(AugmentedImage augmentedImage) {
+    protected ARCoreMarker(AugmentedImage augmentedImage) {
         mAugmentedImage = augmentedImage;
         mTrackingState = SXRTrackingState.PAUSED;
     }

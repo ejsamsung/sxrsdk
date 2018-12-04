@@ -34,27 +34,26 @@ import com.samsungxr.utility.Log;
 import java.io.IOException;
 
 /**
- * A {@linkplain SXRNode scene object} that shows live video from one of
+ * A {@linkplain SXRNode node} that shows live video from one of
  * the device's cameras
  */
 public class SXRCameraNode extends SXRNode {
     private static String TAG = SXRCameraNode.class.getSimpleName();
     private final SurfaceTexture mSurfaceTexture;
-    private boolean mPaused = false;
     private Camera camera;
     private SXRContext gvrContext;
     private boolean cameraSetUpStatus;
     private int fpsMode = -1;
     private boolean isCameraOpen = false;
-    private CameraActivityEvents cameraActivityEvents;
+    private CameraApplicationEvents cameraApplicationEvents;
 
     /**
-     * Create a {@linkplain SXRNode scene object} (with arbitrarily
+     * Create a {@linkplain SXRNode node} (with arbitrarily
      * complex geometry) that shows live video from one of the device's cameras
      *
      * @param gvrContext current {@link SXRContext}
      * @param mesh       an arbitrarily complex {@link SXRMesh} object - see
-     *                   {@link SXRContext#loadMesh(com.samsungxr.SXRAndroidResource)}
+     *                   {@link com.samsungxr.SXRAssetLoader#loadMesh(com.samsungxr.SXRAndroidResource)}
      *                   and {@link SXRContext#createQuad(float, float)}
      * @param camera     an Android {@link Camera}. <em>Note</em>: this constructor
      *                   calls {@link Camera#setPreviewTexture(SurfaceTexture)} so you
@@ -98,12 +97,12 @@ public class SXRCameraNode extends SXRNode {
     }
 
     /**
-     * Create a {@linkplain SXRNode scene object} (with arbitrarily
+     * Create a {@linkplain SXRNode node} (with arbitrarily
      * complex geometry) that shows live video from one of the device's cameras
      *
      * @param gvrContext current {@link SXRContext}
      * @param mesh       an arbitrarily complex {@link SXRMesh} object - see
-     *                   {@link SXRContext#loadMesh(com.samsungxr.SXRAndroidResource)}
+     *                   {@link com.samsungxr.SXRAssetLoader#loadMesh(com.samsungxr.SXRAndroidResource)}
      *                   and {@link SXRContext#createQuad(float, float)}
      * @throws SXRCameraAccessException returns this exception when the camera cannot be
      *                                  initialized correctly.
@@ -138,12 +137,12 @@ public class SXRCameraNode extends SXRNode {
             throw new SXRCameraAccessException("Cannot open the camera");
         }
 
-        cameraActivityEvents = new CameraActivityEvents();
-        gvrContext.getApplication().getEventReceiver().addListener(cameraActivityEvents);
+        cameraApplicationEvents = new CameraApplicationEvents();
+        gvrContext.getApplication().getEventReceiver().addListener(cameraApplicationEvents);
     }
 
     /**
-     * Create a 2D, rectangular {@linkplain SXRNode scene object} that
+     * Create a 2D, rectangular {@linkplain SXRNode node} that
      * shows live video from one of the device's cameras
      *
      * @param gvrContext current {@link SXRContext}
@@ -163,7 +162,7 @@ public class SXRCameraNode extends SXRNode {
     }
 
     /**
-     * Create a 2D, rectangular {@linkplain SXRNode scene object} that
+     * Create a 2D, rectangular {@linkplain SXRNode node} that
      * shows live video from one of the device's cameras.
      *
      * @param gvrContext current {@link SXRContext}
@@ -217,10 +216,9 @@ public class SXRCameraNode extends SXRNode {
         isCameraOpen = false;
     }
 
-    private class CameraActivityEvents extends SXREventListeners.ActivityEvents {
+    private class CameraApplicationEvents extends SXREventListeners.ApplicationEvents {
         @Override
         public void onPause() {
-            mPaused = true;
             closeCamera();
         }
 
@@ -230,34 +228,7 @@ public class SXRCameraNode extends SXRNode {
                 //restore fpsmode
                 setUpCameraForVrMode(fpsMode);
             }
-            mPaused = false;
         }
-    }
-
-    /**
-     * Resumes camera preview
-     *
-     * <p>
-     * Note: {@link #pause()} and {@code resume()} only affect the polling that
-     * links the Android {@link Camera} to this {@linkplain SXRNode SXRF
-     * scene object:} they have <em>no affect</em> on the underlying
-     * {@link Camera} object.
-     */
-    public void resume() {
-        mPaused = false;
-    }
-
-    /**
-     * Pauses camera preview
-     *
-     * <p>
-     * Note: {@code pause()} and {@link #resume()} only affect the polling that
-     * links the Android {@link Camera} to this {@linkplain SXRNode SXRF
-     * scene object:} they have <em>no affect</em> on the underlying
-     * {@link Camera} object.
-     */
-    public void pause() {
-        mPaused = true;
     }
 
     /**
@@ -265,8 +236,8 @@ public class SXRCameraNode extends SXRNode {
      */
     public void close() {
         closeCamera();
-        if(cameraActivityEvents != null){
-            gvrContext.getApplication().getEventReceiver().removeListener(cameraActivityEvents);
+        if(cameraApplicationEvents != null){
+            gvrContext.getApplication().getEventReceiver().removeListener(cameraApplicationEvents);
         }
     }
 

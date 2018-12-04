@@ -31,7 +31,7 @@ import com.samsungxr.SXRNode;
 import com.samsungxr.SXRShaderId;
 
 /**
- * A {@linkplain SXRNode scene object} that shows video, using the
+ * A {@linkplain SXRNode node} that shows video, using the
  * Android {@link MediaPlayer}.
  */
 public class SXRVideoNode extends SXRNode {
@@ -45,11 +45,11 @@ public class SXRVideoNode extends SXRNode {
         public static final int VERTICAL_STEREO = 2;
     };
 
-    private static class ActivityEventsListener extends SXREventListeners.ActivityEvents {
+    private static class ApplicationEventsListener extends SXREventListeners.ApplicationEvents {
         private boolean wasPlaying;
         private SXRVideoNodePlayer mPlayer;
 
-        private ActivityEventsListener(SXRVideoNodePlayer player) {
+        private ApplicationEventsListener(SXRVideoNodePlayer player) {
             mPlayer = player;
         }
 
@@ -66,10 +66,10 @@ public class SXRVideoNode extends SXRNode {
             }
         }
     };
-    private ActivityEventsListener mActivityEventsListener;
+    private ApplicationEventsListener mApplicationEventsListener;
 
     /**
-     * Play a video on a {@linkplain SXRNode scene object} with an
+     * Play a video on a {@linkplain SXRNode node} with an
      * arbitrarily complex geometry, using the Android {@link MediaPlayer}
      *
      * @param gvrContext
@@ -94,7 +94,7 @@ public class SXRVideoNode extends SXRNode {
     }
 
     /**
-     * Play a video on a {@linkplain SXRNode scene object} with an
+     * Play a video on a {@linkplain SXRNode node} with an
      * arbitrarily complex geometry, using the Android {@link MediaPlayer}
      *
      * @param gvrContext
@@ -138,7 +138,7 @@ public class SXRVideoNode extends SXRNode {
     }
 
     /**
-     * Play a video on a {@linkplain SXRNode scene object} with an
+     * Play a video on a {@linkplain SXRNode node} with an
      * arbitrarily complex geometry, using the Android {@link MediaPlayer}
      * 
      * @param gvrContext
@@ -153,8 +153,6 @@ public class SXRVideoNode extends SXRNode {
      *            a {@link SXRExternalTexture} to link with {@link MediaPlayer}
      * @param videoType
      *            One of the {@linkplain SXRVideoType video type constants}
-     * @throws IllegalArgumentException
-     *             on an invalid {@code videoType} parameter
      */
     public SXRVideoNode(final SXRContext gvrContext, SXRMesh mesh,
                                final SXRVideoNodePlayer mediaPlayer, final SXRExternalTexture texture,
@@ -163,8 +161,8 @@ public class SXRVideoNode extends SXRNode {
         SXRShaderId materialType;
 
         gvrVideoNodePlayer = mediaPlayer;
-        mActivityEventsListener = new ActivityEventsListener(gvrVideoNodePlayer);
-        gvrContext.getApplication().getEventReceiver().addListener(mActivityEventsListener);
+        mApplicationEventsListener = new ApplicationEventsListener(gvrVideoNodePlayer);
+        gvrContext.getApplication().getEventReceiver().addListener(mApplicationEventsListener);
 
         switch (videoType) {
             case SXRVideoType.MONO:
@@ -193,7 +191,7 @@ public class SXRVideoNode extends SXRNode {
     }
 
     /**
-     * Play a video on a {@linkplain SXRNode scene object} with an
+     * Play a video on a {@linkplain SXRNode node} with an
      * arbitrarily complex geometry, using the Android {@link MediaPlayer}
      * 
      * @param gvrContext
@@ -317,7 +315,7 @@ public class SXRVideoNode extends SXRNode {
      * {@link MediaPlayer}, if any
      */
     public void release() {
-        getSXRContext().getApplication().getEventReceiver().removeListener(mActivityEventsListener);
+        getSXRContext().getApplication().getEventReceiver().removeListener(mApplicationEventsListener);
         if (mVideo == null) {
             return;
         }
@@ -343,7 +341,7 @@ public class SXRVideoNode extends SXRNode {
     @Override
     protected void finalize() throws Throwable {
         try {
-            getSXRContext().getApplication().getEventReceiver().removeListener(mActivityEventsListener);
+            getSXRContext().getApplication().getEventReceiver().removeListener(mApplicationEventsListener);
             if (null != mVideo) {
                 mVideo.release();
             }
