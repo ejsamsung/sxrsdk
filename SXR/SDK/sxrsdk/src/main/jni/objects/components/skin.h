@@ -10,6 +10,7 @@
 namespace sxr {
 class Renderer;
 class Shader;
+class Transform;
 class UniformBlock;
 
 class Skin : public Component
@@ -26,9 +27,15 @@ public:
     int getNumBones() const { return mBoneMap.size(); }
 
     void setBoneMap(const int* bonemap, int numBones);
-
+    void setSkeleton(Skeleton* skel);
+    void getInverseBindPose(float* inverseBindPose, int numBones);
+    void setInverseBindPose(const float* inverseBindPose, int numBones);
+    void scalePositions(float sf);
     void bindBuffer(Renderer* renderer, Shader* shader);
     bool updateGPU(Renderer* renderer, Shader* shader);
+    UniformBlock* getUniformBlock(){
+        return mBonesBuffer;
+    }
 
 private:
     Skin(const Skin& sksel) = delete;
@@ -37,8 +44,10 @@ private:
     Skin& operator=(Skin&& s) = delete;
 
 private:
-    Skeleton& mSkeleton;
+    std::mutex  mLock;
+    Skeleton* mSkeleton;
     std::vector<int> mBoneMap;
+    glm::mat4* mInverseBindPose;
     UniformBlock* mBonesBuffer;
 };
 

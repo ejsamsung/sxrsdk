@@ -17,6 +17,7 @@ package com.samsungxr.mixedreality;
 
 import android.support.annotation.NonNull;
 
+import com.google.ar.core.Pose;
 import com.samsungxr.SXRBehavior;
 import com.samsungxr.SXRContext;
 
@@ -53,6 +54,13 @@ public abstract class SXRPlane extends SXRBehavior
      */
     public abstract void getCenterPose(@NonNull float[] poseOut);
 
+    /**
+     * Gets the center pose.
+     *
+     * @return the pose of the center of the detected plane.
+     */
+    public abstract Pose getCenterPose();
+
     public Type getPlaneType()
     {
         return mPlaneType;
@@ -72,6 +80,14 @@ public abstract class SXRPlane extends SXRBehavior
      * @return The polygon that best represents the plane
      */
     public abstract FloatBuffer getPolygon();
+
+    /**
+     * Create a array of float containing the 3 coordinates
+     * vertices of the polygon that best represents the plane.
+     *
+     * @return The array of vertices
+     */
+    public abstract float[] get3dPolygonAsArray();
 
     /**
      * @return The parent plane

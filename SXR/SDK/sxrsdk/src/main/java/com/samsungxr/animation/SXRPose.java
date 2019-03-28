@@ -15,6 +15,7 @@
 package com.samsungxr.animation;
 
 import com.samsungxr.PrettyPrint;
+import com.samsungxr.SXRNode;
 import com.samsungxr.utility.Log;
 import org.joml.Math;
 import org.joml.Matrix4f;
@@ -68,11 +69,6 @@ public class SXRPose implements PrettyPrint
      */
     public enum PoseSpace
     {
-        /**
-         * world positions and orientations are relative to the bind pose of the skeleton.
-         */
-        BIND_POSE_RELATIVE,
-
         /**
          * world positions and orientations are relative to the root bone of the skeleton.
          */
@@ -160,10 +156,7 @@ public class SXRPose implements PrettyPrint
         Bone bone = mBones[boneindex];
         int boneParent = mSkeleton.getParentBoneIndex(boneindex);
 
-        if ((boneParent >= 0) && ((bone.Changed & LOCAL_ROT) == LOCAL_ROT))
-        {
-            calcWorld(bone, boneParent);
-        }
+        calcWorld(bone, boneParent);
         pos.x = bone.WorldMatrix.m30();
         pos.y = bone.WorldMatrix.m31();
         pos.z = bone.WorldMatrix.m32();
@@ -256,6 +249,7 @@ public class SXRPose implements PrettyPrint
             throw new IllegalArgumentException("Destination array is the wrong size");
         }
         mNeedSync = true;
+        mBones[0].setLocalPosition(positions[0], positions[1], positions[2]);
         for (int i = 0; i < mBones.length; ++i)
         {
             Bone bone = mBones[i];
@@ -289,7 +283,6 @@ public class SXRPose implements PrettyPrint
      * @see #setWorldMatrix
      * @see #getWorldRotations
      * @see #setWorldPositions
-     * @see SXRSkeleton#setBoneAxis
      * @see #getNumBones
      */
     public void setWorldRotations(float[] rotations)
@@ -306,9 +299,7 @@ public class SXRPose implements PrettyPrint
 
             bone.setWorldRotation(rotations[t], rotations[t + 1], rotations[t + 2], rotations[t + 3]);
             bone.Changed |= WORLD_ROT;
-
             calcLocal(bone, mSkeleton.getParentBoneIndex(i));
-
             if (sDebug)
             {
                 Log.d("BONE", "setWorldRotation: %s %s", mSkeleton.getBoneName(i), bone.toString());
@@ -330,7 +321,6 @@ public class SXRPose implements PrettyPrint
      * @see #getWorldRotation
      * @see #getLocalRotation
      * @see #setWorldMatrix
-     * @see SXRSkeleton#setBoneAxis
      */
     public void getWorldMatrix(int boneindex, Matrix4f mtx)
     {
@@ -351,11 +341,10 @@ public class SXRPose implements PrettyPrint
      * @see #setLocalRotation
      * @see #getWorldMatrix
      * @see #getWorldPositions
-     * @see SXRSkeleton#setBoneAxis
      */
     public void setWorldMatrix(int boneindex, Matrix4f mtx)
     {
-        Bone	  bone = mBones[boneindex];
+        Bone bone = mBones[boneindex];
 
         bone.WorldMatrix.set(mtx);
         if (mSkeleton.getParentBoneIndex(boneindex) >= 0)
@@ -392,7 +381,6 @@ public class SXRPose implements PrettyPrint
      * @see #getWorldRotation
      * @see #getWorldMatrix
      * @see #getNumBones
-     * @see SXRSkeleton#setBoneAxis
      */
     public void getWorldRotations(float[] rotations)
     {
@@ -425,7 +413,6 @@ public class SXRPose implements PrettyPrint
      * @see #setWorldRotation
      * @see #setWorldRotations
      * @see #setWorldMatrix
-     * @see SXRSkeleton#setBoneAxis
      */
     public void	getWorldRotation(int boneindex, Quaternionf q)
     {
@@ -484,7 +471,6 @@ public class SXRPose implements PrettyPrint
      *
      * @see #getWorldRotation
      * @see #getLocalRotation
-     * @see SXRSkeleton#setBoneAxis
      */
     public void getLocalMatrix(int boneindex, Matrix4f mtx)
     {
@@ -495,6 +481,32 @@ public class SXRPose implements PrettyPrint
             calcLocal(bone, mSkeleton.getParentBoneIndex(boneindex));
         }
         bone.getLocalMatrix(mtx);
+    }
+
+    /**
+     * Get the local matrices of all the bones in this pose (relative to parent node).
+     * <p>
+     * The local matrix for each bone are copied into the
+     * destination array as vectors in the order of their bone index.
+     * The array must be as large as 16 times the number of bones in the skeleton
+     * (which can be obtained by calling {@link #getNumBones}).
+     * @param dest	destination array to get local matrices.
+     *
+     * @see #getLocalRotation
+     * @see #getLocalMatrix
+     * @see #getLocalPosition
+     */
+    public void	getLocalMatrices(float[] dest)
+    {
+        if (dest.length != mBones.length * 16)
+        {
+            throw new IllegalArgumentException("Destination array is the wrong size");
+        }
+        sync();
+        for (int i = 0; i < mBones.length; ++i)
+        {
+            mBones[i].LocalMatrix.get(dest, i * 16);
+        }
     }
 
     /**
@@ -527,7 +539,6 @@ public class SXRPose implements PrettyPrint
         }
         if (sDebug)
         {
-
             Log.d("BONE",
                   "setLocalMatrix: %s %s",
                   mSkeleton.getBoneName(boneindex),
@@ -551,7 +562,6 @@ public class SXRPose implements PrettyPrint
      *					the angles are in the bone's local coordinate system.
      * @see #setLocalRotation
      * @see #getNumBones
-     * @see SXRSkeleton#setBoneAxis
      * @see #setWorldRotations
      * @see #setWorldMatrix
      */
@@ -583,7 +593,6 @@ public class SXRPose implements PrettyPrint
      * @see #setLocalRotation
      * @see #setWorldRotations
      * @see #setWorldMatrix
-     * @see SXRSkeleton#setBoneAxis
      */
     public void getLocalRotation(int boneindex, Quaternionf q)
     {
@@ -610,7 +619,6 @@ public class SXRPose implements PrettyPrint
      * @see #setLocalRotations
      * @see #setWorldRotations
      * @see #setWorldMatrix
-     * @see SXRSkeleton#setBoneAxis
      */
     public boolean setLocalRotation(int boneindex, float x, float y, float z, float w)
     {
@@ -649,7 +657,6 @@ public class SXRPose implements PrettyPrint
      * @see #setLocalRotation
      * @see #setWorldRotations
      * @see #setWorldMatrix
-     * @see SXRSkeleton#setBoneAxis
      */
     public void     getLocalPosition(int boneindex, Vector3f pos)
     {
@@ -684,6 +691,58 @@ public class SXRPose implements PrettyPrint
     }
 
     /**
+     * Get the bounding volume of the skeleton's bones.
+     * @return float array with minX, minY, minZ, maxX, maxY maxZ
+     * @see #setWorldRotations
+     * @see #setWorldMatrix
+     * @see #setWorldPositions
+     */
+    public float[] getBound()
+    {
+        sync();
+        float x = mBones[0].WorldMatrix.m30();
+        float y = mBones[0].WorldMatrix.m31();
+        float z = mBones[0].WorldMatrix.m32();
+        float[] bv = new float[6];
+
+        bv[0] = bv[3] = x;
+        bv[1] = bv[4] = y;
+        bv[2] = bv[5] = z;
+        for (int i = 1; i < mBones.length; ++i)
+        {
+            int t = i * 3;
+            x = mBones[i].WorldMatrix.m30();
+            y = mBones[i].WorldMatrix.m31();
+            z = mBones[i].WorldMatrix.m32();
+            if (x < bv[0])
+            {
+                bv[0] = x;
+            }
+            else if (x > bv[3])
+            {
+                bv[3] = x;
+            }
+            if (y < bv[1])
+            {
+                bv[1] = y;
+            }
+            else if (y > bv[4])
+            {
+                bv[4] = y;
+            }
+            if (z < bv[2])
+            {
+                bv[2] = z;
+            }
+            else if (z > bv[5])
+            {
+                bv[5] = z;
+            }
+        }
+        return bv;
+    }
+
+    /**
      * Transform the root bone of the pose by the given matrix.
      * @param trans matrix to transform the pose by.
      */
@@ -710,7 +769,9 @@ public class SXRPose implements PrettyPrint
         float       tolerance = 3 * EPSILON;
 
         if (numbones != src.getNumBones())
+        {
             return false;
+        }
         sync();
         for (int i = 0; i < numbones; ++i)
         {
@@ -735,7 +796,13 @@ public class SXRPose implements PrettyPrint
         int numbones = getNumBones();
 
         if (getSkeleton() != src.getSkeleton())
+        {
             throw new IllegalArgumentException("SXRPose.copy: input pose does not have same skeleton as this pose");
+        }
+        if (numbones > src.getNumBones())
+        {
+            numbones = src.getNumBones();
+        }
         src.sync();
         for (int i = 0; i < numbones; ++i)
         {
@@ -799,7 +866,7 @@ public class SXRPose implements PrettyPrint
     public void  inverse(SXRPose src)
     {
         if (getSkeleton() != src.getSkeleton())
-            throw new IllegalArgumentException("SXRPose.copy: input pose is incompatible with this pose");
+            throw new IllegalArgumentException("SXRPose.inverse: input pose is incompatible with this pose");
         src.sync();
         int numbones = getNumBones();
         Bone srcBone = src.mBones[0];
@@ -807,11 +874,10 @@ public class SXRPose implements PrettyPrint
 
         mNeedSync = true;
         srcBone.WorldMatrix.invertAffine(dstBone.WorldMatrix);
-        srcBone.LocalMatrix.set(dstBone.WorldMatrix);
+        dstBone.LocalMatrix.set(dstBone.WorldMatrix);
         if (sDebug)
         {
             Log.d("BONE", "invert: %s %s", mSkeleton.getBoneName(0), dstBone.toString());
-
         }
         for (int i = 1; i < numbones; ++i)
         {
@@ -841,23 +907,17 @@ public class SXRPose implements PrettyPrint
     public boolean	setPosition(float x, float y, float z)
     {
         Bone bone = mBones[0];
-        float dx = x - bone.WorldMatrix.m30();
-        float dy = y - bone.WorldMatrix.m31();
-        float dz = z - bone.WorldMatrix.m32();
 
         sync();
         bone.LocalMatrix.setTranslation(x, y, z);
-        for (int i = 0; i < mBones.length; ++i)
-        {
-            bone = mBones[i];
-            bone.WorldMatrix.m30(bone.WorldMatrix.m30() + dx);
-            bone.WorldMatrix.m31(bone.WorldMatrix.m31() + dy);
-            bone.WorldMatrix.m32(bone.WorldMatrix.m32() + dz);
-        }
+        bone.WorldMatrix.setTranslation(x, y, z);
+        bone.Changed = WORLD_ROT;
+        mNeedSync = true;
         if (sDebug)
         {
             Log.d("BONE", "setWorldPosition: %s ", mSkeleton.getBoneName(0), bone.toString());
         }
+        sync();
         return true;
     }
 
@@ -867,16 +927,20 @@ public class SXRPose implements PrettyPrint
         Vector3f v = new Vector3f();
 
         bone.getScale(v);
-        v.x /= sx;
-        v.y /= sy;
-        v.z /= sz;
-        bone.WorldMatrix.scale(v.x, v.y, v.z);
-        bone.LocalMatrix.scale(1 / v.x, 1 / v.y, 1 / v.z);
-        bone.Changed = WORLD_ROT | WORLD_POS;
-        for (int i = 1; i < mBones.length; ++i)
+        sx /= v.x;
+        sy /= v.y;
+        sz /= v.z;
+        bone.WorldMatrix.scale(sx, sy, sz);
+        bone.LocalMatrix.scale(1 / sx, 1 / sy, 1 / sz);
+        for (int i = 0; i < mBones.length; ++i)
         {
             bone = mBones[i];
-            bone.WorldMatrix.scale(v.x, v.y, v.z);
+            bone.WorldMatrix.scale(sx, sy, sz);
+            bone.WorldMatrix.getTranslation(v);
+            v.x *= sx;
+            v.y *= sy;
+            v.z *= sz;
+            bone.WorldMatrix.setTranslation(v);
             bone.Changed = WORLD_ROT | WORLD_POS;
         }
         if (sDebug)
@@ -907,7 +971,9 @@ public class SXRPose implements PrettyPrint
             boolean	update;
 
             if (pid < 0)							        // root bone?
+            {
                 continue;
+            }
             update = (mBones[pid].Changed & (WORLD_ROT | LOCAL_ROT)) != 0;
             if (!mSkeleton.isLocked(i))				        // bone not locked?
             {
@@ -945,9 +1011,16 @@ public class SXRPose implements PrettyPrint
      */
     protected void		calcWorld(Bone bone, int parentId)
     {
-        getWorldMatrix(parentId, mTempMtxB);   // WorldMatrix (parent) TempMtxB
-        mTempMtxB.mul(bone.LocalMatrix);       // WorldMatrix = WorldMatrix(parent) * LocalMatrix
-        bone.WorldMatrix.set(mTempMtxB);
+        if (parentId >= 0)
+        {
+            getWorldMatrix(parentId, mTempMtxB);   // WorldMatrix (parent) TempMtxB
+            mTempMtxB.mul(bone.LocalMatrix);       // WorldMatrix = WorldMatrix(parent) * LocalMatrix
+            bone.WorldMatrix.set(mTempMtxB);
+        }
+        else
+        {
+            bone.WorldMatrix.set(bone.LocalMatrix);
+        }
      }
 
     /**

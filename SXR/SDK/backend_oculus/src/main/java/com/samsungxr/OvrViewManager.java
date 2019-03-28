@@ -135,7 +135,7 @@ class OvrViewManager extends SXRViewManager {
         mStatsLine.addColumn(mTracerDrawEyes2.getStatColumn());
         mStatsLine.addColumn(mTracerAfterDrawEyes.getStatColumn());
 
-        mControllerReader = new OvrControllerReader(mApplication.getActivityNative().getNative());
+        mControllerReader = new OvrControllerReader(application, mApplication.getActivityNative().getNative());
     }
 
     /**
@@ -308,10 +308,15 @@ class OvrViewManager extends SXRViewManager {
 
         mRenderBundle.createRenderTargetChain(isMultiview);
     }
-    /*
-     * SXRF APIs
+
+    /**
+     * Reset the Oculus head & controller poses
      */
+    public void recenterPose() {
+        recenterPose(mApplication.getActivityNative().getNative());
+    }
 
     private native long getRenderTextureInfo(long ptr, int index, int eye );
     private native void drawEyes(long ptr);
+    private native void recenterPose(long ptr);
 }

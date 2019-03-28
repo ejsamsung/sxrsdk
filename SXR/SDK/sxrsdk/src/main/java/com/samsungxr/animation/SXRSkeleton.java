@@ -31,11 +31,14 @@ import com.samsungxr.utility.Log;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -83,12 +86,6 @@ import java.util.List;
 public class SXRSkeleton extends SXRComponent implements PrettyPrint
 {
     /**
-     * The pose space designates how the world matrices
-     * of the pose relate to one another.
-     */
-    public static final int BIND_POSE_RELATIVE = 1;
-
-    /**
      * world positions and orientations are relative to the root bone of the skeleton.
      */
     public static final int SKELETON_ROOT = 0;
@@ -124,11 +121,7 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
 
     protected String[] mBoneNames;
     protected Vector3f mRootOffset;     // offset for root bone animations
-    protected Vector3f mBoneAxis;       // axis of bone, defines bone coordinate system
-    protected SXRPose mBindPose;        // bind pose for this skeleton
-    protected SXRPose mInverseBindPose; // inverse bind pose for this skeleton
     protected SXRPose mPose;            // current pose for this skeleton
-    protected SXRPose mSkinPose;        // current pose for the skin
     protected float[] mPoseMatrices;
 
     static public long getComponentType()
@@ -153,13 +146,11 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
         super(ctx, NativeSkeleton.ctor(parentBones));
         mType = getComponentType();
         mParentBones = parentBones;
-        mBoneAxis = new Vector3f(0, 0, 1);
         mRootOffset = new Vector3f(0, 0, 0);
         mBoneOptions = new int[parentBones.length];
         mBoneNames = new String[parentBones.length];
         mBones = new SXRNode[parentBones.length];
         mPose = new SXRPose(this);
-        mBindPose = new SXRPose(this);
         mPoseMatrices =  new float[parentBones.length * 16];
     }
 
@@ -183,14 +174,12 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
         int numBones = boneNames.size();
         mType = getComponentType();
         mParentBones = sTempBoneParents;
-        mBoneAxis = new Vector3f(0, 0, 1);
         mRootOffset = new Vector3f(0, 0, 0);
         mBoneOptions = new int[numBones];
         mBoneNames = new String[numBones];
         mBones = new SXRNode[numBones];
         mPoseMatrices =  new float[numBones * 16];
         mPose = new SXRPose(this);
-        mBindPose = new SXRPose(this);
         for (int boneId = 0; boneId < numBones; ++boneId)
         {
             String boneName = boneNames.get(boneId);
@@ -219,7 +208,6 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
         int numBones = NativeSkeleton.getNumBones(nativePtr);
         mType = getComponentType();
         mParentBones = new int[numBones];
-        mBoneAxis = new Vector3f(0, 0, 1);
         mRootOffset = new Vector3f(0, 0, 0);
         mBoneOptions = new int[numBones];
         mBoneNames = new String[numBones];
@@ -228,18 +216,14 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
         NativeSkeleton.getBoneParents(nativePtr, mParentBones);
         NativeSkeleton.getPose(nativePtr, mPoseMatrices);
         mPose = new SXRPose(this);
-        mBindPose = new SXRPose(this);
         Matrix4f mtx = new Matrix4f();
         for (int boneId = 0; boneId < numBones; ++boneId)
         {
-            mtx.get(mPoseMatrices, boneId * 16);
-            mBindPose.setWorldMatrix(boneId, mtx);
+            mtx.set(mPoseMatrices, boneId * 16);
             mPose.setWorldMatrix(boneId, mtx);
             mBoneNames[boneId] = NativeSkeleton.getBoneName(nativePtr, boneId);
         }
-        mBindPose.sync();
         mPose.sync();
-        setBindPose(mBindPose);
     }
 
     protected int[] makeParentBoneIds(SXRNode root, List<String> boneNames)
@@ -342,120 +326,12 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
     }
 
     /**
-     * Set the bind pose of the skeleton to describe the initial position and
-     * orientation of the bones when the skinned meshes are not modified.
-     * <p>
-     * The <i>bind pose</i> of the skeleton defines the position and orientation of the bones before any
-     * animations are applied. Usually it represents the pose that matches
-     * the source vertices of the meshes driven by the skeleton.
-     * You can restore the skeleton to it's bind pose with {@link #restoreBindPose()}
-     * <p>
-      * The bind pose is maintained as a {link SXRPose} object internal to the skeleton
-     * and cannot be shared across skeletons. Setting the bind pose copies the
-     * value of the input pose into the skeleton's bind pose. Subsequent
-     * updates to the input pose are not reflected in the skeleton's bind pose.
-     * @param pose {@link SXRPose} containing rotations and positions for the bind pose.
-     * @see #setPose(SXRPose)
-     * @see #getBindPose()
-     * @see #restoreBindPose()
-     * @see {@link SXRPose}
+     * Get the bounding volume of the skeleton's bones.
+     * @return float array with minX, minY, minZ, maxX, maxY maxZ
      */
-    public void setBindPose(SXRPose pose)
+    public float[] getBound()
     {
-        if (pose != mBindPose)
-        {
-            pose.sync();
-            mBindPose.copy(pose);
-        }
-        if (mInverseBindPose == null)
-        {
-            mInverseBindPose = new SXRPose(this);
-        }
-        mInverseBindPose.inverse(mBindPose);
-        mPose.copy(mBindPose);
-        updateBonePose();
-    }
-
-    /**
-     * Set the bind pose of the skeleton to describe the initial position and
-     * orientation of the bones when the skinned meshes are not modified.
-     * <p>
-     * The <i>bind pose</i> of the skeleton defines the position and orientation of the bones before any
-     * animations are applied. Usually it represents the pose that matches
-     * the source vertices of the meshes driven by the skeleton.
-     * You can restore the skeleton to it's bind pose with {@link #restoreBindPose()}
-     * <p>
-     * The bind pose is maintained as a {link SXRPose} object internal to the skeleton
-     * and cannot be shared across skeletons. Setting the bind pose copies the
-     * value of the input pose into the skeleton's bind pose. Subsequent
-     * updates to the input pose are not reflected in the skeleton's bind pose.
-     * @param rotations new bind pose rotations
-     * @param positions new bind pose positions
-     *                  Both arrays must have enough entries for all the bones in the skeleton.
-     *                  The positions and orientation are all relative to the root
-     *                  bone of the skeleton (not the parent bone).
-     * @see #setPose(SXRPose)
-     * @see #getBindPose()
-     * @see #restoreBindPose()
-     * @see {@link SXRPose}
-     */
-    public void setBindPose(float[] rotations, float[] positions)
-    {
-        mBindPose.setWorldRotations(rotations);
-        mBindPose.setWorldPositions(positions);
-        if (mInverseBindPose == null)
-        {
-            mInverseBindPose = new SXRPose(this);
-        }
-        mInverseBindPose.inverse(mBindPose);
-        mPose.copy(mBindPose);
-        updateBonePose();
-    }
-
-
-    /**
-     * The bind pose is the pose the skeleton is in when no rotations are
-     * applied to it's joints. This is a reference to an internal {@SXRPose}
-     * which cannot be shared across multiple skeletons.
-     * <p>
-     * Do not modify the bind pose directly - consider it a read only pose.
-     * The skeleton maintains the inverse bind pose internally so
-     * you should always call {@link #setBindPose(SXRPose)} to
-     * change it.
-     * </p>
-     *
-     * @see #getNumBones
-     * @see #setBindPose
-     * @see #getPose
-     * @see SXRPose#setWorldRotations
-     * @see SXRPose#setWorldPositions
-     */
-    public final SXRPose getBindPose()
-    {
-        return mBindPose;
-    }
-
-    /**
-     * The inverse bind pose transforms a pose relative to the
-     * skeleton root into a pose that can be applied to the
-     * mesh being skinned. This is a reference to an internal {@SXRPose}
-     * which cannot be shared across multiple skeletons.
-     * <p>
-     * Do not modify the inverse bind pose directly - consider it a read only pose.
-     * The skeleton maintains the inverse bind pose internally so
-     * you should always call {@link #setBindPose(SXRPose)} to
-     * change it.
-     * </p>
-     *
-     * @see #getNumBones
-     * @see #setBindPose
-     * @see #getPose
-     * @see SXRPose#setWorldRotations
-     * @see SXRPose#setWorldPositions
-     */
-    public final SXRPose getInverseBindPose()
-    {
-        return mInverseBindPose;
+        return mPose.getBound();
     }
 
     /**
@@ -530,19 +406,24 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      * @param pose {@link @SXRPose} containing rotations and positions relative
      *                              to the root bone of the skeleton.
      * @see #getPose
-     * @see #restoreBindPose
-     * @see #setBindPose
      */
     public void setPose(SXRPose pose)
     {
         SXRSkeleton skel = pose.getSkeleton();
-        pose.sync();
-        if (pose == mPose)
-            return;
         if (skel != this)
+        {
             throw new IllegalArgumentException("setPose: input pose has incompatible skeleton");
-        mPose.copy(pose);
-        updateBonePose();
+        }
+        synchronized (this)
+        {
+            if (pose == mPose)
+            {
+                return;
+            }
+            pose.sync();
+            mPose.copy(pose);
+            updateBonePose();
+        }
     }
 
     /**
@@ -573,70 +454,51 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public void applyPose(SXRPose newpose, int poseSpace)
     {
-        int numbones = getNumBones();
-
-        /*
-         * Apply input pose that is relative to the bind pose.
-         * Multiply the input rotations by the bind pose
-         * rotations to get rotations relative to the
-         * skeleton root.
-         */
-        if (poseSpace == BIND_POSE_RELATIVE)
+        synchronized (this)
         {
-            for (int i = 0; i < numbones; ++i)
-            {
-                SXRPose.Bone srcBone = newpose.getBone(i);
+            int numbones = getNumBones();
 
-                if ((srcBone.Changed != 0) && !isLocked(i))
-                {
-                    mBindPose.getLocalMatrix(i, mTempMtx);
-                    mTempMtx.mul(srcBone.LocalMatrix);
-                    mTempMtx.getUnnormalizedRotation(mTempQuatA);
-                    mPose.setLocalRotation(i, mTempQuatA.x, mTempQuatA.y, mTempQuatA.z, mTempQuatA.w);
-                    srcBone.Changed = 0;
-                }
-            }
-        }
-        /*
-         * Apply input pose that contains only local rotations.
-         */
-        else if (poseSpace == ROTATION_ONLY)
-        {
-            for (int i = 0; i < numbones; ++i)
-            {
-                SXRPose.Bone srcBone = newpose.getBone(i);
-
-                if ((srcBone.Changed != 0) && !isLocked(i))
-                {
-                    newpose.getLocalRotation(i, mTempQuatA);
-                    mPose.setLocalRotation(i, mTempQuatA.x, mTempQuatA.y, mTempQuatA.z, mTempQuatA.w);
-                    srcBone.Changed = 0;
-                }
-            }
-        }
-        /*
-         * Apply the world rotations from the input pose to
-         * the skeleton's current pose. The rotations are
-         * already relative to the skeleton root.
-         */
-        else
-        {
-            newpose.sync();
-            if (mPose != newpose)
+            /*
+             * Apply input pose that contains only local rotations.
+             */
+            if (poseSpace == ROTATION_ONLY)
             {
                 for (int i = 0; i < numbones; ++i)
                 {
-                    if (!isLocked(i))
+                    SXRPose.Bone srcBone = newpose.getBone(i);
+
+                    if ((srcBone.Changed != 0) && !isLocked(i))
                     {
-                        SXRPose.Bone srcBone = newpose.getBone(i);
-                        srcBone.getLocalMatrix(mTempMtx);
-                        mPose.setLocalMatrix(i, mTempMtx);
+                        newpose.getLocalRotation(i, mTempQuatA);
+                        mPose.setLocalRotation(i, mTempQuatA.x, mTempQuatA.y, mTempQuatA.z, mTempQuatA.w);
+                        srcBone.Changed = 0;
                     }
                 }
             }
+            /*
+             * Apply the world rotations from the input pose to
+             * the skeleton's current pose. The rotations are
+             * already relative to the skeleton root.
+             */
+            else
+            {
+                newpose.sync();
+                if (mPose != newpose)
+                {
+                    for (int i = 0; i < numbones; ++i)
+                    {
+                        if (!isLocked(i))
+                        {
+                            SXRPose.Bone srcBone = newpose.getBone(i);
+                            srcBone.getLocalMatrix(mTempMtx);
+                            mPose.setLocalMatrix(i, mTempMtx);
+                        }
+                    }
+                }
+            }
+            mPose.sync();
+            updateBonePose();
         }
-        mPose.sync();
-        updateBonePose();
     }
 
     /**
@@ -654,42 +516,27 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public void transformPose(SXRPose newpose)
     {
-        int numbones = getNumBones();
-        Matrix4f rootMtx = owner.getTransform().getModelMatrix4f();
-
-        rootMtx.getUnnormalizedRotation(mTempQuatB);
-        mTempQuatB.conjugate();
-        newpose.sync();
-        for (int i = 0; i < numbones; ++i)
+        synchronized (this)
         {
-            SXRPose.Bone srcBone = newpose.getBone(i);
+            int numbones = getNumBones();
+            Matrix4f rootMtx = owner.getTransform().getModelMatrix4f();
 
-            if ((mBoneOptions[i] & BONE_LOCK_ROTATION) == 0)
+            rootMtx.getUnnormalizedRotation(mTempQuatB);
+            mTempQuatB.conjugate();
+            newpose.sync();
+            for (int i = 0; i < numbones; ++i)
             {
-                rootMtx.mul(mTempMtx, mTempMtx);
-                mTempMtx.mul(srcBone.LocalMatrix, mTempMtx);
-                mPose.setWorldMatrix(i, mTempMtx);
-            }
-        }
-        updateBonePose();
-    }
+                SXRPose.Bone srcBone = newpose.getBone(i);
 
-    /**
-     * Restore the skeleton to the bind pose.
-     * <p>
-     * The bind pose is the default pose of the skeleton when not being animated.
-     * It is initialized as the pose the skeleton is when it is first attached
-     * to the Skeleton but you can change it with {@link #setBindPose(SXRPose)}
-     *
-     * @see #setBindPose
-     * @see #getBindPose
-     * @see SXRPose
-     */
-    public void restoreBindPose()
-    {
-        mInverseBindPose.inverse(mBindPose);
-        mPose.copy(mBindPose);
-        updateBonePose();
+                if ((mBoneOptions[i] & BONE_LOCK_ROTATION) == 0)
+                {
+                    rootMtx.mul(mTempMtx, mTempMtx);
+                    mTempMtx.mul(srcBone.LocalMatrix, mTempMtx);
+                    mPose.setWorldMatrix(i, mTempMtx);
+                }
+            }
+            updateBonePose();
+        }
     }
 
     /**
@@ -713,10 +560,17 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public int getBoneIndex(SXRNode bone)
     {
-        for (int i = 0; i < getNumBones(); ++i)
-            if (mBones[i] == bone)
-                return i;
-        return -1;
+        synchronized (this)
+        {
+            for (int i = 0; i < getNumBones(); ++i)
+            {
+                if (mBones[i] == bone)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
     }
 
     /**
@@ -727,11 +581,17 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public int getBoneIndex(String bonename)
     {
-        for (int i = 0; i < getNumBones(); ++i)
-
-            if (mBoneNames[i].equals(bonename))
-                return i;
-        return -1;
+        synchronized (this)
+        {
+            for (int i = 0; i < getNumBones(); ++i)
+            {
+                if (mBoneNames[i].equals(bonename))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
     }
 
     /**
@@ -746,27 +606,6 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
     }
 
     /**
-     * Get the bone Z axis which defines the bone coordinate system.
-     * <p>
-     * The default bone coordinate system has the Z axis of
-     * the bone at (0, 0, 1).
-     */
-    public Vector3f getBoneAxis()
-    {
-        return mBoneAxis;
-    }
-
-    /**
-     * Set the bone Z axis which defines the bone coordinate system.
-     * The default bone coordinate system has the Z axis of
-     * the bone at (0, 0, 1).
-     */
-    public void setBoneAxis(Vector3f boneAxis)
-    {
-        mBoneAxis = boneAxis;
-    }
-
-    /**
      * Sets the name of the designated bone.
      *
      * @param boneindex zero based index of bone to rotate.
@@ -775,8 +614,11 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public void setBoneName(int boneindex, String bonename)
     {
-        mBoneNames[boneindex] = bonename;
-        NativeSkeleton.setBoneName(getNative(), boneindex, bonename);
+        synchronized (this)
+        {
+            mBoneNames[boneindex] = bonename;
+            NativeSkeleton.setBoneName(getNative(), boneindex, bonename);
+        }
     }
 
     /**
@@ -787,14 +629,23 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public String getBoneName(int boneindex)
     {
-        return mBoneNames[boneindex];
+        synchronized (this)
+        {
+            return mBoneNames[boneindex];
+        }
     }
 
     /**
      * Get the list of bone names in the order of bone indices.
      * @return bone name list
      */
-    public final String[] getBoneNames() { return mBoneNames; }
+    public final String[] getBoneNames()
+    {
+        synchronized (this)
+        {
+            return mBoneNames;
+        }
+    }
 
     /**
      * Set the bone names for all of the bones from an array.
@@ -807,11 +658,14 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public void setBoneNames(String[] boneNames)
     {
-        if (getNumBones() != boneNames.length)
+        synchronized (this)
         {
-            throw new IllegalArgumentException("Bone names array has wrong length");
+            if (getNumBones() != boneNames.length)
+            {
+                throw new IllegalArgumentException("Bone names array has wrong length");
+            }
+            mBoneNames = boneNames;
         }
-        mBoneNames = boneNames;
     }
 
     /**
@@ -822,12 +676,18 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public SXRNode getBone(int boneindex)
     {
-        return mBones[boneindex];
+        synchronized (this)
+        {
+            return mBones[boneindex];
+        }
     }
 
     public void setBone(int boneindex, SXRNode bone)
     {
-        mBones[boneindex] = bone;
+        synchronized (this)
+        {
+            mBones[boneindex] = bone;
+        }
     }
 
     /**
@@ -847,7 +707,10 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public void setBoneOptions(int boneindex, int options)
     {
-        mBoneOptions[boneindex] = options;
+        synchronized (this)
+        {
+            mBoneOptions[boneindex] = options;
+        }
     }
 
     /**
@@ -858,7 +721,10 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public int getBoneOptions(int boneindex)
     {
-        return mBoneOptions[boneindex];
+        synchronized (this)
+        {
+            return mBoneOptions[boneindex];
+        }
     }
 
     /**
@@ -868,34 +734,27 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public boolean isLocked(int boneindex)
     {
-        return (mBoneOptions[boneindex] & BONE_LOCK_ROTATION) != 0;
+        synchronized (this)
+        {
+            return (mBoneOptions[boneindex] & BONE_LOCK_ROTATION) != 0;
+        }
     }
 
     public void onAttach(SXRNode root)
     {
         super.onAttach(root);
-        if (mInverseBindPose == null)
-        {
-            attachBones(mBindPose);
-            mBindPose.sync();
-            mPose.copy(mBindPose);
-            mInverseBindPose = new SXRPose(this);
-            mInverseBindPose.inverse(mBindPose);
-            updateBonePose();
-        }
-        else
-        {
-            attachBones(null);
-            restoreBindPose();
-        }
+        attachBones(null);
     }
 
     public void onDetach(SXRNode root)
     {
         super.onDetach(root);
-        for (int i = 0; i < mBones.length; ++i)
+        synchronized (this)
         {
-            mBones[i] = null;
+            for (int i = 0; i < mBones.length; ++i)
+            {
+                setBone(i, null);
+            }
         }
     }
 
@@ -923,11 +782,13 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
                 String bonename = newbone.getName();
 
                 if (bonename.isEmpty())            // ignore nodes without names
+                {
                     return true;
+                }
                 int boneindex = getBoneIndex(bonename);
                 if (boneindex >= 0)                // a bone we recognize?
                 {
-                    mBones[boneindex] = newbone;
+                    setBone(boneindex, newbone);
                     if (savepose != null)
                     {
                         savepose.setWorldMatrix(boneindex, newbone.getTransform().getModelMatrix4f());
@@ -936,7 +797,10 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
                 return true;
             }
         };
-        owner.forAllDescendants(visitor);
+        synchronized (this)
+        {
+            owner.forAllDescendants(visitor);
+        }
     }
 
     /**
@@ -947,22 +811,25 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public void poseFromBones()
     {
-        for (int i = 0; i < getNumBones(); ++i)
+        synchronized (this)
         {
-            SXRNode bone = mBones[i];
-            if (bone == null)
+            for (int i = 0; i < getNumBones(); ++i)
             {
-                continue;
+                SXRNode bone = mBones[i];
+                if (bone == null)
+                {
+                    continue;
+                }
+                if ((mBoneOptions[i] & BONE_LOCK_ROTATION) != 0)
+                {
+                    continue;
+                }
+                SXRTransform trans = bone.getTransform();
+                mPose.setLocalMatrix(i, trans.getLocalModelMatrix4f());
             }
-            if ((mBoneOptions[i] & BONE_LOCK_ROTATION) != 0)
-            {
-                continue;
-            }
-            SXRTransform trans = bone.getTransform();
-            mPose.setLocalMatrix(i, trans.getLocalModelMatrix4f());
+            mPose.sync();
+            updateBonePose();
         }
-        mPose.sync();
-        updateBonePose();
     }
 
     /**
@@ -975,17 +842,20 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public void poseFromBones(int boneOptions)
     {
-        for (int i = 0; i < getNumBones(); ++i)
+        synchronized (this)
         {
-            SXRNode bone = mBones[i];
-            if ((bone != null) && (mBoneOptions[i] & boneOptions) != 0)
+            for (int i = 0; i < getNumBones(); ++i)
             {
-                SXRTransform trans = bone.getTransform();
-                mPose.setLocalMatrix(i, trans.getLocalModelMatrix4f());
+                SXRNode bone = mBones[i];
+                if ((bone != null) && (mBoneOptions[i] & boneOptions) != 0)
+                {
+                    SXRTransform trans = bone.getTransform();
+                    mPose.setLocalMatrix(i, trans.getLocalModelMatrix4f());
+                }
             }
+            mPose.sync();
+            updateBonePose();
         }
-        mPose.sync();
-        updateBonePose();
     }
 
     /**
@@ -1000,99 +870,47 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      */
     public void poseToBones()
     {
-        mPose.sync();
-        for (int i = 0; i < getNumBones(); ++i)
+        synchronized (this)
         {
-            SXRNode bone = mBones[i];
-            if ((bone != null) &&
-               ((mBoneOptions[i] & BONE_LOCK_ROTATION) == 0))
+            mPose.sync();
+            for (int i = 0; i < getNumBones(); ++i)
             {
-                mPose.getLocalMatrix(i, mTempMtx);
-                bone.getTransform().setModelMatrix(mTempMtx);
+                SXRNode bone = mBones[i];
+                if ((bone != null) && ((mBoneOptions[i] & BONE_LOCK_ROTATION) == 0))
+                {
+                    mPose.getLocalMatrix(i, mTempMtx);
+                    bone.getTransform().setModelMatrix(mTempMtx);
+                }
             }
+            updateBonePose();
         }
     }
 
-
     /*
-     * Compute the skinning matrices from the current pose.
+     * Update the C++ skeleton with the current pose.
      * <p>
      * The skin pose is relative to the untransformed mesh.
-     * It will be used to transform the vertices before
+     * The bone pose is relative to the skeleton bone.
+     * The skin pose is used to transform the vertices before
      * overall translate, rotation and scale are performed.
      * It is the current pose relative to the bind pose
      * of the mesh.
      * <p>
      * Each skinned mesh has an associated @{link SXRSkin} component
      * which manages the bones that affect that mesh.
-     */
-    public SXRPose computeSkinPose()
-    {
-        if (mInverseBindPose == null)
-        {
-            return null;
-        }
-        mPose.sync();
-        if (mSkinPose == null)
-        {
-            mSkinPose = new SXRPose(mPose);
-        }
-        else
-        {
-            mSkinPose.copy(mPose);
-        }
-        mSkinPose.combine(mInverseBindPose);
-        return mSkinPose;
-    }
-
-    /*
-     * Compute the skinning matrices from the current pose.
-     * <p>
-     * The skin pose is relative to the untransformed mesh.
-     * It will be used to transform the vertices before
-     * overall translate, rotation and scale are performed.
-     * It is the current pose relative to the bind pose
-     * of the mesh.
-     * <p>
-     * Each skinned mesh has an associated @{link SXRSkin} component
-     * which manages the bones that affect that mesh.
-     * This function updates the GPU skinning matrices each frame.
-     * @see SXRSkin
-     */
-    public void updateSkinPose()
-    {
-        SXRPose skinPose = computeSkinPose();
-
-        skinPose.getWorldMatrices(mPoseMatrices);
-        NativeSkeleton.setSkinPose(getNative(), mPoseMatrices);
-    }
-
-    /*
-     * Compute the skinning matrices from the current pose.
-     * <p>
-     * The skin pose is relative to the untransformed mesh.
-     * It will be used to transform the vertices before
-     * overall translate, rotation and scale are performed.
-     * It is the current pose relative to the bind pose
-     * of the mesh.
-     * <p>
-     * Each skinned mesh has an associated @{link SXRSkin} component
-     * which manages the bones that affect that mesh.
-     * This function updates the GPU skinning matrices each frame.
+     * This skin component maintains the inverse bind pose
+     * of the mesh so it can be multiplied by the world bone pose
+     * to compute the proper skin pose.
+     * This function updates the local and world pose matrices each frame.
      * @see SXRSkin
      */
     public void updateBonePose()
     {
-        SXRPose pose = getPose();
-        int t = 0;
-
-        for (int i = 0; i < mParentBones.length; ++i)
-        {
-            pose.getLocalMatrix(i, mTempMtx);
-            mTempMtx.get(mPoseMatrices, t);
-            t += 16;
-        }
+        mPose.sync();
+        mPose.getLocalMatrices(mPoseMatrices);
         NativeSkeleton.setPose(getNative(), mPoseMatrices);
+        mPose.getWorldMatrices(mPoseMatrices);
+        NativeSkeleton.setWorldPose(getNative(), mPoseMatrices);
     }
 
     /**
@@ -1101,80 +919,281 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
      * original bones and all the bones in the new skeleton.
      *
      * @param newSkel skeleton to merge with this one
+     * @param startBone name of bone to start merging from.
+     *                 This bone must be in BOTH skeletons.
+     *                 If null, the first bone in the new skeleton is used.
+     * @return name of bone in this skeleton the new skeleton was attached to.
      */
-    public void merge(SXRSkeleton newSkel)
+    public String merge(SXRSkeleton newSkel, String startBone)
     {
-        int numBones = getNumBones();
-        List<Integer> parentBoneIds = new ArrayList<Integer>(numBones + newSkel.getNumBones());
-        List<String> newBoneNames = new ArrayList<String>(newSkel.getNumBones());
-        List<Matrix4f> newMatrices = new ArrayList<Matrix4f>(newSkel.getNumBones());
-        SXRPose oldBindPose = getBindPose();
-        SXRPose curPose = getPose();
+        synchronized (this)
+        {
+            int numBones = getNumBones();
+            int[] parentBoneIds = new int[newSkel.getNumBones()];
+            List<String> newBoneNames = new ArrayList<String>();
+            List<Matrix4f> matrices = new ArrayList<Matrix4f>();
+            List<SXRNode> bones = new ArrayList<SXRNode>();
+            int numNewBones = 0;
+            SXRPose curPose = getPose();
+            SXRPose newPose = newSkel.getPose();
+            int startBoneId = 0;
 
-        for (int i = 0; i < numBones; ++i)
-        {
-            parentBoneIds.add(mParentBones[i]);
-        }
-        for (int j = 0; j < newSkel.getNumBones(); ++j)
-        {
-            String boneName = newSkel.getBoneName(j);
-            int boneId = getBoneIndex(boneName);
-            if (boneId < 0)
+            if (startBone != null)
             {
-                int parentId = newSkel.getParentBoneIndex(j);
-                Matrix4f m = new Matrix4f();
+                int temp = newSkel.getBoneIndex(startBone);
 
-                newSkel.getBindPose().getLocalMatrix(j, m);
-                newMatrices.add(m);
-                newBoneNames.add(boneName);
+                if ((getBoneIndex(startBone) >= 0) && (temp >= 0))
+                {
+                    startBoneId = temp;
+                }
+            }
+            /*
+             * Accumulate the bind pose matrices and parent bone IDs
+             * for the old skeleton
+             */
+            for (int j = 0; j < numBones; ++j)
+            {
+                Matrix4f m = new Matrix4f();
+                curPose.getLocalMatrix(j, m);
+                matrices.add(m);
+            }
+            /*
+             * Add bones in the new skeleton that are not in
+             * the old skeleton.
+             */
+            for (int j = startBoneId; j < newSkel.getNumBones(); ++j)
+            {
+                String boneName = newSkel.getBoneName(j);
+                int boneId = getBoneIndex(boneName);
+                Matrix4f m = new Matrix4f();
+                SXRNode newBone = newSkel.getBone(j);
+                int parentId;
+
+                newPose.getLocalMatrix(j, m);
+                parentId = newSkel.getParentBoneIndex(j);
+                if (boneId < 0)            // source bone not in existing skeleton?
+                {
+                    if (parentId >= 0)     // parent is found?
+                    {
+                        String parName = newSkel.getBoneName(parentId);
+                        parentId = getBoneIndex(parName);
+                        if (parentId < 0)  // parent is a new bone
+                        {
+                            parentId = newBoneNames.indexOf(parName);
+                            if (parentId >= 0)
+                            {
+                                parentId += numBones;
+                            }
+                        }
+                    }
+                    if (parentId < 0)
+                    {
+                        parentId = 0;
+                    }
+                    matrices.add(m);
+                    bones.add(newBone);
+                    newBoneNames.add(boneName);
+                    parentBoneIds[numNewBones] = parentId;
+                    ++numNewBones;
+                }
+                else if (startBone != null)
+                {
+                    if (j > startBoneId)
+                    {
+                        matrices.set(boneId, m);
+                    }
+                }
+            }
+
+            int n = numBones + numNewBones;
+            if (numNewBones > 0)
+            {
+                /*
+                 * Enlarge arrays in this skeleton to accomodate
+                 * the new bones added and copy the old data
+                 */
+                int[] parentIds = Arrays.copyOf(mParentBones, n);
+                int[] boneOptions = Arrays.copyOf(mBoneOptions, n);
+                String[] boneNames = Arrays.copyOf(mBoneNames, n);
+
+                mBones = Arrays.copyOf(mBones, n);
+                mPoseMatrices = new float[n * 16];
+                /*
+                 * Add bones from the new skeleton into this skeleton
+                 */
+                for (int i = 0; i < newBoneNames.size(); ++i)
+                {
+                    int m = numBones + i;
+                    int pid = parentBoneIds[i];
+                    SXRNode newBone = bones.get(i);
+                    parentIds[m] = pid;
+                    boneNames[m] = newBoneNames.get(i);
+                    setBone(m, newBone);
+                }
+                mBoneOptions = boneOptions;
+                mBoneNames = boneNames;
+                mParentBones = parentIds;
+                mPose = new SXRPose(this);
+
+                /*
+                 * Update the native skeleton
+                 */
+                NativeSkeleton.updateBones(getNative(), mParentBones, boneNames);
+            }
+            if (startBone != null)
+            {
+                for (int i = 0; i < newSkel.getNumBones(); ++i)
+                {
+                    String boneName = newSkel.getBoneName(i);
+                    int boneIndex = getBoneIndex(boneName);
+                    SXRNode newBone = newSkel.getBone(i);
+                    SXRNode oldBone = getBone(boneIndex);
+
+                    if ((newBone != oldBone) && (newBone != null) && (oldBone != null))
+                    {
+                        for (int c = 0; c < newBone.getChildrenCount(); ++c)
+                        {
+                            SXRNode child = newBone.getChildByIndex(c);
+                            newBone.removeChildObject(child);
+                            oldBone.addChildObject(child);
+                            --c;
+                        }
+                    }
+                }
+            }
+            /*
+             * Update the poses for this skeleton
+             */
+            for (int j = 0; j < n; ++j)
+            {
+                mPose.setLocalMatrix(j, matrices.get(j));
+            }
+            mPose.sync();
+            poseToBones();
+            if (startBone == null)
+            {
+                int parentId = getBoneIndex(newSkel.getBoneName(0));
                 if (parentId >= 0)
                 {
-                    boneName = newSkel.getBoneName(parentId);
-                    parentId = getBoneIndex(boneName);
+                    startBone = getBoneName(parentId);
                 }
-                parentBoneIds.add(parentId);
             }
         }
-        if (parentBoneIds.size() == numBones)
-        {
-            return;
-        }
-        int n = numBones +  parentBoneIds.size();
-        int[] parentIds = Arrays.copyOf(mParentBones, n);
-        int[] boneOptions = Arrays.copyOf(mBoneOptions, n);
-        String[] boneNames = Arrays.copyOf(mBoneNames, n);
-
-        mBones = Arrays.copyOf(mBones, n);
-        mPoseMatrices =  new float[n * 16];
-        for (int i = 0; i < parentBoneIds.size(); ++i)
-        {
-            n = numBones + i;
-            parentIds[n] = parentBoneIds.get(i);
-            boneNames[n] = newBoneNames.get(i);
-            boneOptions[n] = BONE_ANIMATE;
-        }
-        mBoneOptions = boneOptions;
-        mBoneNames = boneNames;
-        mParentBones = parentIds;
-        mPose = new SXRPose(this);
-        mBindPose = new SXRPose(this);
-        mBindPose.copy(oldBindPose);
-        mPose.copy(curPose);
-        mBindPose.sync();
-        for (int j = 0; j < newSkel.getNumBones(); ++j)
-        {
-            mBindPose.setLocalMatrix(numBones + j, newMatrices.get(j));
-            mPose.setLocalMatrix(numBones + j, newMatrices.get(j));
-        }
-        setBindPose(mBindPose);
-        mPose.sync();
-        updateBonePose();
+        return startBone;
     }
 
-    public SXRNode createSkeletonGeometry(SXRNode parent)
+    /**
+     * Get the center of this skeleton's bounding volume.
+     * @param center vector with center of skeleton
+     */
+    public float getCenter(Vector3f center)
+    {
+        SXRNode bone = getBone(0);
+        Matrix4f mtx1 = bone.getTransform().getModelMatrix4f();
+        Matrix4f mtx2 = new Matrix4f();
+        float[] bv = getBound();
+        Vector4f cmin = new Vector4f(bv[0], bv[1], bv[2], 1);
+        Vector4f cmax = new Vector4f(bv[3], bv[4], bv[5], 1);
+
+        getPose().getLocalMatrix(0, mtx2);
+        mtx2.invert(mtx2);
+        mtx1.mul(mtx2, mtx2);
+        cmin.mul(mtx2);
+        cmax.mul(mtx2);
+
+        center.x = (cmax.x + cmin.x) / 2;
+        center.y = (cmax.y + cmin.y) / 2;
+        center.z = (cmax.z + cmin.z) / 2;
+        float r = Math.max(cmax.x - cmin.x,
+                           Math.max(cmax.y - cmin.y,
+                                    cmax.z - cmin.z));
+        float sf = 0.5f / r;
+        center.x *= sf;
+        center.y *= sf;
+        center.z *= sf;
+        return r;
+    }
+
+    /**
+     * Scale the skeleton and associated geometry uniformly.
+     * <p>
+     * This function modifies the inverse bind pose matrices
+     * in the {@link SXRSkin} components for the meshes
+     * as well as scaling the vertex positions.
+     * The {@link SXRSkeleton} pose is changed to match
+     * the new geometry.
+     * <p>
+     * One consequence of scaling is that
+     * animations which worked at the previous scale
+     * may no longer work as the positions will be
+     * incorrect.
+     * </p>
+     * @param sf    floating point scale factor
+     */
+    public void scaleSkin(final SXRNode root, final float sf)
+    {
+        final Set<SXRVertexBuffer> meshes = new HashSet<SXRVertexBuffer>();
+
+        synchronized (this)
+        {
+            poseToBones();
+            setEnable(false);
+            /*
+             * scale the node and skin positions
+             */
+            root.forAllDescendants(new SXRNode.SceneVisitor()
+            {
+                @Override
+                public boolean visit(SXRNode node)
+                {
+                    SXRRenderData rd = node.getRenderData();
+                    SXRSkin skin = (SXRSkin) node.getComponent(SXRSkin.getComponentType());
+                    if (skin != null)
+                    {
+                        skin.scalePositions(sf);
+                    }
+                    else
+                    {
+                        SXRTransform t = node.getTransform();
+                        t.setPosition(t.getPositionX() * sf,
+                                      t.getPositionY() * sf,
+                                      t.getPositionZ() * sf);
+                    }
+                    if (rd != null)
+                    {
+                        float bbox[] = new float[6];
+                        rd.getMesh().getBoxBound(bbox);
+                        float cx = (bbox[3] + bbox[0]) / 2;
+                        float cy = (bbox[4] + bbox[1]) / 2;
+                        float cz = (bbox[5] + bbox[2]) / 2;
+                        Log.d("NOLA", "%s %f, %f, %f", node.getName(), cx, cy, cz);
+                        meshes.add(rd.getMesh().getVertexBuffer());
+                    }
+                    return true;
+                }
+            });
+            poseFromBones();
+
+            /*
+             * scale the mesh geometry
+             */
+            final Matrix4f scaleMtx = new Matrix4f();
+            final float[] scaleData = new float[16];
+            scaleMtx.scale(sf);
+            scaleMtx.get(scaleData);
+            for (SXRVertexBuffer vbuf : meshes)
+            {
+                vbuf.transform(scaleData, false);
+            }
+            updateBonePose();
+            setEnable(true);
+        }
+    }
+
+    public SXRNode createSkeletonGeometry(SXRNode parent, float boneScale)
     {
         GeometryHelper helper = new GeometryHelper(this);
-        return helper.createSkeletonGeometry(parent);
+        return helper.createSkeletonGeometry(parent, boneScale);
     }
 
     @Override
@@ -1206,7 +1225,7 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
             mSkeleton = skel;
         }
 
-        public SXRNode createSkeletonGeometry(SXRNode root)
+        public SXRNode createSkeletonGeometry(SXRNode root, float boneScale)
         {
             SXRContext ctx = mSkeleton.getSXRContext();
             SXRMaterial flatMaterialSphr = new SXRMaterial(ctx);
@@ -1214,8 +1233,8 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
 
             flatMaterialSphr.setColor(1f, 1f, 0f);
             flatMaterialCyl.setColor(1f, 0f, 0f);
-            mCylProto =  new SXRCylinderNode(ctx, 0.2f, 0.2f, 1f, 2, 8, true);
-            mSphereProto =  new SXRSphereNode(ctx, true, flatMaterialSphr, 0.5f);
+            mCylProto =  new SXRCylinderNode(ctx, 0.2f * boneScale, 0.2f * boneScale, 1f, 2, 8, true);
+            mSphereProto =  new SXRSphereNode(ctx, true, flatMaterialSphr, boneScale * 0.5f);
             mCylProto.getRenderData().setMaterial(flatMaterialCyl);
             SXRNode rootGeo = makeSpheres();
 
@@ -1230,7 +1249,7 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
         private SXRNode makeSpheres()
         {
             SXRContext ctx = mSkeleton.getSXRContext();
-            SXRPose bindPose = mSkeleton.getBindPose();
+            SXRPose pose = mSkeleton.getPose();
             Vector3f childDir = new Vector3f(0,0,0);
 
             for (int j = 0; j < mSkeleton.getNumBones(); j++)
@@ -1264,7 +1283,7 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
                     {
                         parent.addChildObject(boneGeo);
                         float height = calcCylHeight(j);
-                        bindPose.getLocalPosition(j, childDir);
+                        pose.getLocalPosition(j, childDir);
 
                         SXRNode cyl = createBoneGeo(childDir, height);
                         cyl.setName(mSkeleton.getBoneName(parentIndex) + "_" + boneName);
@@ -1279,7 +1298,7 @@ public class SXRSkeleton extends SXRComponent implements PrettyPrint
         {
             Vector3f p = new Vector3f(0,0,0);
 
-            mSkeleton.getBindPose().getLocalPosition(boneIndex, p);
+            mSkeleton.getPose().getLocalPosition(boneIndex, p);
             return (float) p.length();
         }
 
@@ -1319,13 +1338,15 @@ class NativeSkeleton
 
     static native boolean getBoneParents(long object, int[] parentIds);
 
+    static native void updateBones(long object, int[] parentids, String[] bonenames);
+
     static native long getComponentType();
 
     static native boolean setPose(long object, float[] matrices);
 
     static native boolean getPose(long object, float[] matrices);
 
-    static native boolean setSkinPose(long object, float[] matrices);
+    static native boolean setWorldPose(long object, float[] matrices);
 
     static native void setBoneName(long object, int index, String name);
 

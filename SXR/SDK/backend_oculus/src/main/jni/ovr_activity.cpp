@@ -379,6 +379,9 @@ void SXRActivity::onDrawFrame(jobject jViewManager) {
                 frameBuffer_[eye].destroy();
             }
 
+            if (nullptr != gearController) {
+                gearController->reset();
+            }
             vrapi_LeaveVrMode(oculusMobile_);
             oculusMobile_ = nullptr;
         } else {
@@ -396,5 +399,9 @@ void SXRActivity::onDrawFrame(jobject jViewManager) {
     bool SXRActivity::usingMultiview() const {
         LOGD("Activity: usingMultview = %d", use_multiview);
         return use_multiview;
+    }
+
+    void SXRActivity::recenterPose() const {
+        vrapi_RecenterPose(oculusMobile_);
     }
 }

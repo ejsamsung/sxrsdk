@@ -16,15 +16,14 @@
 package com.samsungxr.mixedreality.CVLibrary;
 
 //import com.google.ar.core.Plane;
+import com.google.ar.core.Pose;
 import android.support.annotation.NonNull;
 
 import com.samsungxr.SXRContext;
 import com.samsungxr.mixedreality.SXRPlane;
 import com.samsungxr.mixedreality.SXRTrackingState;
 
-import java.lang.reflect.Array;
 import java.nio.FloatBuffer;
-import java.util.Arrays;
 
 
 class CVLibraryPlane extends SXRPlane {
@@ -50,6 +49,10 @@ class CVLibraryPlane extends SXRPlane {
     public void getCenterPose(@NonNull float[] poseOut)
     {
         System.arraycopy(mPose.getPoseMatrix(), 0, poseOut, 0, 16);
+    }
+
+    public Pose getCenterPose() {
+        return null;
     }
 
     /**
@@ -98,6 +101,11 @@ class CVLibraryPlane extends SXRPlane {
     public FloatBuffer getPolygon() {
 
         //return mARPlane.getPolygon();
+        return null;
+    }
+
+    @Override
+    public float[] get3dPolygonAsArray() {
         return null;
     }
 
