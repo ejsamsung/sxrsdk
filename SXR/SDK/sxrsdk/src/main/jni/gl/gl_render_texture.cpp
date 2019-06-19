@@ -23,6 +23,8 @@
 #include "gl_render_image.h"
 #include "objects/light.h" // for DEBUG_LIGHT
 
+#include "util/sxr_log.h"
+
 namespace sxr {
 extern void texImage3D(int color_format, int width, int height, int depth , GLenum target);
 typedef void (GL_APIENTRY *PFNGLFRAMEBUFFERTEXTUREMULTIVIEWOVRPROC)(GLenum target,
@@ -114,10 +116,6 @@ GLRenderTexture::~GLRenderTexture()
         delete renderTexture_gl_color_buffer_;
     if (renderTexture_gl_resolve_buffer_)
         delete renderTexture_gl_resolve_buffer_;
-    if (renderTexture_gl_pbo_)
-    {
-        glDeleteBuffers(1, &renderTexture_gl_pbo_);
-    }
 }
 
 bool GLRenderTexture::isReady()
@@ -127,15 +125,6 @@ bool GLRenderTexture::isReady()
         return false;
     }
     return true;
-}
-
-void GLRenderTexture::initialize()
-{
-    glGenBuffers(1, &renderTexture_gl_pbo_);
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, renderTexture_gl_pbo_);
-    Image* image = getImage();
-    glBufferData(GL_PIXEL_PACK_BUFFER, image->getWidth() * image->getHeight() * 4, 0, GL_DYNAMIC_READ);
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 }
 
 void GLRenderTexture::generateRenderTextureNoMultiSampling(int jdepth_format,
@@ -401,7 +390,6 @@ GLNonMultiviewRenderTexture::GLNonMultiviewRenderTexture(int width, int height, 
     GLenum depth_format;
 
     setImage(colorbuffer);
-    initialize();
     getImage()->isReady();
     switch (jdepth_format)
     {
@@ -476,7 +464,6 @@ GLMultiviewRenderTexture::GLMultiviewRenderTexture(int width, int height, int sa
 
     setImage(colorbuffer);
 
-    initialize();
     colorbuffer->isReady();
     switch (jdepth_format)
     {

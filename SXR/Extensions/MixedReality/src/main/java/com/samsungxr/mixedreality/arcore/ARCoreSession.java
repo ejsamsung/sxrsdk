@@ -17,7 +17,7 @@ package com.samsungxr.mixedreality.arcore;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
-import android.opengl.Matrix;
+import android.media.Image;
 import android.util.DisplayMetrics;
 import android.view.Surface;
 
@@ -36,40 +36,41 @@ import com.google.ar.core.Session;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
+import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
-
 import com.samsungxr.SXRCamera;
 import com.samsungxr.SXRCameraRig;
 import com.samsungxr.SXRContext;
 import com.samsungxr.SXRDrawFrameListener;
 import com.samsungxr.SXREventReceiver;
-import com.samsungxr.SXRExternalTexture;
+import com.samsungxr.SXRExternalImage;
 import com.samsungxr.SXRMaterial;
 import com.samsungxr.SXRMesh;
 import com.samsungxr.SXRMeshCollider;
+import com.samsungxr.SXRNode;
 import com.samsungxr.SXRPerspectiveCamera;
 import com.samsungxr.SXRPicker;
 import com.samsungxr.SXRRenderData;
 import com.samsungxr.SXRScene;
-import com.samsungxr.SXRNode;
 import com.samsungxr.SXRTexture;
+import com.samsungxr.mixedreality.IAnchorEvents;
 import com.samsungxr.mixedreality.IMarkerEvents;
 import com.samsungxr.mixedreality.IMixedReality;
 import com.samsungxr.mixedreality.IMixedRealityEvents;
 import com.samsungxr.mixedreality.IPlaneEvents;
 import com.samsungxr.mixedreality.SXRAnchor;
-import com.samsungxr.mixedreality.SXRMarker;
 import com.samsungxr.mixedreality.SXRHitResult;
 import com.samsungxr.mixedreality.SXRLightEstimate;
+import com.samsungxr.mixedreality.SXRMarker;
 import com.samsungxr.mixedreality.SXRMixedReality;
 import com.samsungxr.mixedreality.SXRPlane;
-import com.samsungxr.mixedreality.IAnchorEvents;
 import com.samsungxr.mixedreality.SXRPointCloud;
 import com.samsungxr.mixedreality.SXRTrackingState;
 import com.samsungxr.utility.Log;
+
 import org.joml.Math;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -305,6 +306,11 @@ public class ARCoreSession implements IMixedReality
         pointCloud.setARPointCloud(mLastARFrame.acquirePointCloud());
 
         return pointCloud;
+    }
+
+    @Override
+    public Image acquireCameraImage() throws NotYetAvailableException {
+        return mLastARFrame.acquireCameraImage();
     }
 
     @Override
@@ -554,7 +560,8 @@ public class ARCoreSession implements IMixedReality
 
     private void onInitARCoreSession(SXRContext gvrContext) throws CameraNotAvailableException
     {
-        SXRTexture passThroughTexture = new SXRExternalTexture(gvrContext);
+        final SXRExternalImage image = new SXRExternalImage(gvrContext);
+        final SXRTexture passThroughTexture = new SXRTexture(image);
 
         mSession.setCameraTextureName(passThroughTexture.getId());
 

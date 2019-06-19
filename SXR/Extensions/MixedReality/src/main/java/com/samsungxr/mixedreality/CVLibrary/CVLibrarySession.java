@@ -23,6 +23,7 @@ import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.graphics.Bitmap;
+import android.media.Image;
 import android.opengl.Matrix;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -50,11 +51,11 @@ import android.app.Activity;
 
 import com.google.ar.core.Camera;
 import com.google.ar.core.HitResult;
+import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.samsungxr.SXRCameraRig;
 import com.samsungxr.SXRContext;
 import com.samsungxr.SXRDrawFrameListener;
 import com.samsungxr.SXREventReceiver;
-import com.samsungxr.SXRExternalTexture;
 import com.samsungxr.SXRMaterial;
 import com.samsungxr.SXRMeshCollider;
 import com.samsungxr.SXRPerspectiveCamera;
@@ -280,6 +281,11 @@ public class CVLibrarySession implements IMixedReality, SXRDrawFrameListener
 
     @Override
     public SXRPointCloud acquirePointCloud() {
+        return null;
+    }
+
+    @Override
+    public Image acquireCameraImage() {
         return null;
     }
 

@@ -29,6 +29,8 @@
 #include <objects/components/perspective_camera.h>
 #include <objects/components/render_target.h>
 
+#include "util/sxr_log.h"
+
 static const char* activityClassName = "android/app/Activity";
 static const char* applicationClassName = "com/samsungxr/SXRApplication";
 static const char* viewManagerClassName = "com/samsungxr/OvrViewManager";
@@ -362,6 +364,11 @@ void SXRActivity::onDrawFrame(JNIEnv* env, jobject jViewManager, jobject javaMai
         const glm::quat quat = glm::conjugate(glm::inverse(tmp));
 
         cameraRig_->setRotationSensorData(0, quat.w, quat.x, quat.y, quat.z, 0, 0, 0);
+        float x = updatedTracking.HeadPose.Pose.Position.x;
+        float y = updatedTracking.HeadPose.Pose.Position.y;
+        float z = updatedTracking.HeadPose.Pose.Position.z;
+
+        cameraRig_->getHeadTransform()->set_position(x, y, z);
     }
 
     cameraRig_->updateRotation();
